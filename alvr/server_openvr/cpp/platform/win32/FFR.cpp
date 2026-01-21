@@ -30,12 +30,19 @@ FoveationVars CalculateFoveationVars() {
     float targetEyeWidth = (float)Settings::Instance().m_renderWidth / 2;
     float targetEyeHeight = (float)Settings::Instance().m_renderHeight;
 
-    float centerSizeX = (float)Settings::Instance().m_foveationCenterSizeX;
+/*     float centerSizeX = (float)Settings::Instance().m_foveationCenterSizeX;
     float centerSizeY = (float)Settings::Instance().m_foveationCenterSizeY;
     float centerShiftX = (float)Settings::Instance().m_foveationCenterShiftX;
     float centerShiftY = (float)Settings::Instance().m_foveationCenterShiftY;
     float edgeRatioX = (float)Settings::Instance().m_foveationEdgeRatioX;
-    float edgeRatioY = (float)Settings::Instance().m_foveationEdgeRatioY;
+    float edgeRatioY = (float)Settings::Instance().m_foveationEdgeRatioY; */
+
+    float centerSizeX = 0.2f;
+    float centerSizeY =  0.2f;
+    float centerShiftX = (float)Settings::Instance().m_foveationCenterShiftX;
+    float centerShiftY = (float)Settings::Instance().m_foveationCenterShiftY;
+    float edgeRatioX = 2.0f;
+    float edgeRatioY = 2.0f;
 
     float edgeSizeX = targetEyeWidth - centerSizeX * targetEyeWidth;
     float edgeSizeY = targetEyeHeight - centerSizeY * targetEyeHeight;
@@ -107,8 +114,8 @@ void FFR::Initialize(ID3D11Texture2D* compositionTexture) {
                                          : DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
     );
 
-    if (Settings::Instance().m_enableFoveatedEncoding) {
-        std::vector<uint8_t> compressAxisAlignedShaderCSO(
+     if (Settings::Instance().m_enableFoveatedEncoding) {
+    /*    std::vector<uint8_t> compressAxisAlignedShaderCSO(
             COMPRESS_AXIS_ALIGNED_CSO_PTR,
             COMPRESS_AXIS_ALIGNED_CSO_PTR + COMPRESS_AXIS_ALIGNED_CSO_LEN
         );
@@ -121,7 +128,22 @@ void FFR::Initialize(ID3D11Texture2D* compositionTexture) {
             foveatedRenderingBuffer.Get()
         );
 
-        mPipelines.push_back(compressAxisAlignedPipeline);
+        mPipelines.push_back(compressAxisAlignedPipeline); */
+
+        std::vector<uint8_t> AADTCSO(
+            AADT2_CSO_PTR,
+            AADT2_CSO_PTR + AADT2_CSO_LEN
+        );
+        auto AADT2Pipeline = RenderPipeline(mDevice.Get());
+        AADT2Pipeline.Initialize(
+            { compositionTexture },
+            mQuadVertexShader.Get(),
+            AADTCSO,
+            mOptimizedTexture.Get(),
+            foveatedRenderingBuffer.Get()
+        );
+
+        mPipelines.push_back(AADT2Pipeline);
     } else {
         mOptimizedTexture = compositionTexture;
     }

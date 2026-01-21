@@ -69,12 +69,38 @@ fn vertex_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     return result;
 }
 
+//============================================================================================================
+// ------------------ AADT2 helper functions -------------------------------------------------
+fn MapUV_inverse_AADT2(coord: f32, center_start: f32, center_end: f32, first_peripheral_size: f32, next_peripheral_size: f32, cSize: f32, pSize: f32) -> f32 {
+    let rate_peripheral: f32 = ((1.0 - cSize) / 2.0) / pSize;
+    let rate_center: f32 = cSize / (center_end - center_start);
+    var out: f32 = coord;
+    if (coord < first_peripheral_size) {
+        out = coord * (1.0 / rate_peripheral);
+    } else if (coord < (first_peripheral_size + cSize)) {
+        out = center_start + (coord - first_peripheral_size) * (1.0 / rate_center);
+    } else {
+        out = center_end + (coord - first_peripheral_size - cSize) * (1.0 / rate_peripheral);
+    }
+    return out;
+}
+
+/* fn TextureToEyeUV(textureUV: vec2f, isRightEye: f32) -> vec2f {
+    return vec2f((textureUV.x + isRightEye * (1.0 - 2.0 * textureUV.x)) * 2.0, textureUV.y);
+}
+
+fn EyeToTextureUV(eyeUV: vec2f, isRightEye: f32) -> vec2f {
+    return vec2f(eyeUV.x * 0.5 + isRightEye * (1.0 - eyeUV.x), eyeUV.y);
+} */
+//============================================================================================================
+
+
 @fragment
 fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     var corrected_uv = uv;
     // tell upscaler to target a lower resolution for the edges
     var upscale_source_resolution = 1.0;
-    if ENABLE_FFE {
+/*     if ENABLE_FFE {
         let view_size_ratio = vec2f(VIEW_WIDTH_RATIO, VIEW_HEIGHT_RATIO);
         let edge_ratio = vec2f(EDGE_X_RATIO, EDGE_Y_RATIO);
 
@@ -123,7 +149,63 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
         if pc.view_idx == 1 {
             corrected_uv.x = 1.0 - corrected_uv.x;
         }
-    }
+    } */
+
+            var EdgeRatio = vec2f(2.0, 2.0);
+            var CenterSize = vec2f(0.2, 0.2);    
+            var CenterShift_r = vec2f(0.5, 0.5);
+            var CenterShift = vec2f(0.5, 0.5);
+
+            var CenterSizeOwn = CenterSize;
+            var PeripheralNewScreenSpace = (vec2f(1.0, 1.0) / (EdgeRatio + vec2f(1.0, 1.0))) / 2.0;
+            var CenterSizeNewScreenSpace = EdgeRatio / (EdgeRatio + vec2f(1.0, 1.0));
+            var CenterShiftOwn = CenterShift;
+
+            var isRightEye: f32 = f32(pc.view_idx);
+
+            // Re-scale to -1..1 for center shift handling
+            if (isRightEye == 1.0) {
+                CenterShiftOwn = CenterShift_r;
+                CenterShiftOwn.x = 1.0 - CenterShiftOwn.x;
+            }
+            CenterShiftOwn.y = 1.0 - CenterShiftOwn.y;
+            CenterShiftOwn.x = 2.0 * CenterShiftOwn.x - 1.0;
+            CenterShiftOwn.y = 2.0 * CenterShiftOwn.y - 1.0;
+
+            //var alignedUV = TextureToEyeUV(corrected_uv, isRightEye);
+            var alignedUV = corrected_uv;
+
+            // Peripheral size without center shift (texture-space)
+            var peripheral_size = (vec2f(1.0, 1.0) - CenterSizeOwn) / 2.0;
+
+            // Center max shift (texture-space)
+            var center_max_shift_x = 2.0 * vec2f(0.5 - peripheral_size.x, 0.5 + peripheral_size.x) - vec2f(1.0, 1.0);
+            var center_max_shift_y = 2.0 * vec2f(0.5 - peripheral_size.y, 0.5 + peripheral_size.y) - vec2f(1.0, 1.0);
+            var centerShift_clamp: vec2f;
+            centerShift_clamp.x = clamp(CenterShiftOwn.x, center_max_shift_x.x, center_max_shift_x.y);
+            centerShift_clamp.y = clamp(CenterShiftOwn.y, center_max_shift_y.x, center_max_shift_y.y);
+
+            // Foveation parameters (screen-space)
+            var center_start: vec2f;
+            center_start.x = (PeripheralNewScreenSpace.x + ((centerShift_clamp.x / center_max_shift_x.y) * PeripheralNewScreenSpace.x));
+            center_start.y = (PeripheralNewScreenSpace.y + ((centerShift_clamp.y / center_max_shift_y.y) * PeripheralNewScreenSpace.y));
+            var center_end = center_start + CenterSizeNewScreenSpace;
+
+            // Fixed peripheral size (texture-space)
+            var left_peripheral_size = (center_start.x / PeripheralNewScreenSpace.x) * peripheral_size.x;
+            var right_peripheral_size = 1.0 - CenterSizeOwn.x - left_peripheral_size;
+
+            var bottom_peripheral_size = (center_start.y / PeripheralNewScreenSpace.y) * peripheral_size.y;
+            var top_peripheral_size = 1.0 - CenterSizeOwn.y - bottom_peripheral_size;
+
+            // Screen space uv -> texture-space mapping (inverse)
+            var uncompressedUV: vec2f;
+            uncompressedUV.x = MapUV_inverse_AADT2(alignedUV.x, center_start.x, center_end.x, left_peripheral_size, right_peripheral_size, CenterSizeOwn.x, PeripheralNewScreenSpace.x);
+            uncompressedUV.y = MapUV_inverse_AADT2(alignedUV.y, center_start.y, center_end.y, bottom_peripheral_size, top_peripheral_size, CenterSizeOwn.y, PeripheralNewScreenSpace.y);
+
+            // obtain final texture UV
+            corrected_uv = uncompressedUV;
+
 
     var color: vec3f;
     if ENABLE_UPSCALING {
