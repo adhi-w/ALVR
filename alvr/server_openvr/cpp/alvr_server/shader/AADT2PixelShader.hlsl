@@ -32,8 +32,7 @@ float MapUV(float coord, float center_start, float center_end, float first_perip
 float4 main(float2 uv : TEXCOORD0) : SV_Target{
     float2 edgeRatio = float2(2.0, 2.0); 
     float2 centerSize_ = float2(0.2, 0.2); 
-    float2 centerShift_r= float2(0.5, 0.5);
-    float2 centerShift_ = float2(0.5, 0.5);
+    float2 centerShift_ = float2(0.6, 0.5);
 
     float2 CenterSizeOwn = centerSize_;
     float2 PeripheralNewScreenSpace = (1.0 / (edgeRatio + 1.0)) / 2.0;
@@ -43,11 +42,6 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target{
 	// Determine if this is the right eye based on horizontal position.
     bool isRightEye = uv.x > 0.5;    
     float2 eyeUV = TextureToEyeUV(uv, isRightEye); // Transform screen UV to texture UV
-
-    if (isRightEye) {
-        CenterShiftOwn = centerShift_r;
-        CenterShiftOwn.x = 1 - CenterShiftOwn.x;
-    }
 
     // Re-scale to -1..1
     CenterShiftOwn.y = 1 - CenterShiftOwn.y;

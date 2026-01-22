@@ -152,9 +152,8 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     } */
 
             var EdgeRatio = vec2f(2.0, 2.0);
-            var CenterSize = vec2f(0.2, 0.2);    
-            var CenterShift_r = vec2f(0.5, 0.5);
-            var CenterShift = vec2f(0.5, 0.5);
+            var CenterSize = vec2f(0.2, 0.2);   
+            var CenterShift = vec2f(0.6, 0.5);
 
             var CenterSizeOwn = CenterSize;
             var PeripheralNewScreenSpace = (vec2f(1.0, 1.0) / (EdgeRatio + vec2f(1.0, 1.0))) / 2.0;
@@ -164,15 +163,13 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
             var isRightEye: f32 = f32(pc.view_idx);
 
             // Re-scale to -1..1 for center shift handling
-            if (isRightEye == 1.0) {
-                CenterShiftOwn = CenterShift_r;
+            if (isRightEye == 1.0) {                
                 CenterShiftOwn.x = 1.0 - CenterShiftOwn.x;
             }
             CenterShiftOwn.y = 1.0 - CenterShiftOwn.y;
             CenterShiftOwn.x = 2.0 * CenterShiftOwn.x - 1.0;
             CenterShiftOwn.y = 2.0 * CenterShiftOwn.y - 1.0;
-
-            //var alignedUV = TextureToEyeUV(corrected_uv, isRightEye);
+            
             var alignedUV = corrected_uv;
 
             // Peripheral size without center shift (texture-space)
