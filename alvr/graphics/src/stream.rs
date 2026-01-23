@@ -1,15 +1,15 @@
 use super::{GraphicsContext, MAX_PUSH_CONSTANTS_SIZE, staging::StagingRenderer};
 use alvr_common::{
     ViewParams,
-    glam::{self, Mat4, UVec2, Vec3, Vec4},
+    glam::{self, Mat4, UVec2, Vec2, Vec3, Vec4},
 };
 use alvr_session::{FoveatedEncodingConfig, PassthroughMode, UpscalingConfig};
 use std::{ffi::c_void, iter, mem, rc::Rc};
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayoutDescriptor,
     BindGroupLayoutEntry, BindingResource, BindingType, Color, ColorTargetState, ColorWrites,
-    FragmentState, LoadOp, PipelineCompilationOptions, PipelineLayoutDescriptor, PrimitiveState,
-    PrimitiveTopology, PushConstantRange, RenderPass, RenderPassColorAttachment,
+    BufferBindingType, FragmentState, LoadOp, PipelineCompilationOptions, PipelineLayoutDescriptor,
+    PrimitiveState, PrimitiveTopology, PushConstantRange, RenderPass, RenderPassColorAttachment,
     RenderPassDescriptor, RenderPipeline, RenderPipelineDescriptor, SamplerBindingType,
     SamplerDescriptor, ShaderStages, StoreOp, TextureSampleType, TextureView,
     TextureViewDescriptor, TextureViewDimension, VertexState, include_wgsl,
@@ -50,6 +50,7 @@ pub struct StreamRenderer {
     context: Rc<GraphicsContext>,
     staging_renderer: StagingRenderer,
     pipeline: RenderPipeline,
+    gaze_buffer: wgpu::Buffer,
     views_objects: [ViewObjects; 2],
 }
 
@@ -89,6 +90,16 @@ impl StreamRenderer {
                     binding: 1,
                     visibility: ShaderStages::FRAGMENT,
                     ty: BindingType::Sampler(SamplerBindingType::Filtering),
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::FRAGMENT,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
                     count: None,
                 },
             ],
@@ -177,6 +188,13 @@ impl StreamRenderer {
             ..Default::default()
         });
 
+        let gaze_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: 16, // vec2<f32> + padding
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let mut view_objects = vec![];
         let mut staging_textures_gl = vec![];
         for target_swapchain in &swapchain_textures {
@@ -195,6 +213,10 @@ impl StreamRenderer {
                     BindGroupEntry {
                         binding: 1,
                         resource: BindingResource::Sampler(&sampler),
+                    },
+                    BindGroupEntry {
+                        binding: 2,
+                        resource: gaze_buffer.as_entire_binding(),
                     },
                 ],
             });
@@ -237,6 +259,7 @@ impl StreamRenderer {
             context,
             staging_renderer,
             pipeline,
+            gaze_buffer,
             views_objects: view_objects.try_into().unwrap(),
         }
     }
@@ -248,11 +271,20 @@ impl StreamRenderer {
         hardware_buffer: *mut c_void,
         view_params: [StreamViewParams; 2],
         passthrough: Option<&PassthroughMode>,
+        gaze_uv: Option<[Vec2; 2]>,
     ) {
         // if hardware_buffer is available copy stream to staging texture
         if !hardware_buffer.is_null() {
             self.staging_renderer.render(hardware_buffer);
         }
+
+        let gaze_uv = gaze_uv.unwrap_or([Vec2::new(0.5, 0.5), Vec2::new(0.5, 0.5)]);
+        let mut gaze_bytes = [0u8; 16];
+        gaze_bytes[0..4].copy_from_slice(&gaze_uv[0].x.to_le_bytes());
+        gaze_bytes[4..8].copy_from_slice(&gaze_uv[0].y.to_le_bytes());
+        gaze_bytes[8..12].copy_from_slice(&gaze_uv[1].x.to_le_bytes());
+        gaze_bytes[12..16].copy_from_slice(&gaze_uv[1].y.to_le_bytes());
+        self.context.queue.write_buffer(&self.gaze_buffer, 0, &gaze_bytes);
 
         let mut encoder = self
             .context

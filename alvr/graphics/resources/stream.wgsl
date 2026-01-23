@@ -6,6 +6,14 @@ const GAMMA: vec3f = vec3f(2.4);
 override ENABLE_SRGB_CORRECTION: bool;
 override ENCODING_GAMMA: f32;
 
+// Debug gaze marker: when enabled, the shader will draw a small circle at the
+override ENABLE_GAZE_DEBUG: bool = true;
+override GAZE_MARKER_RADIUS: f32 = 0.002;
+override GAZE_MARKER_FEATHER: f32 = 0.001;
+override GAZE_MARKER_R: f32 = 1.0;
+override GAZE_MARKER_G: f32 = 0.0;
+override GAZE_MARKER_B: f32 = 0.0;
+
 override ENABLE_UPSCALING: bool = false;
 override UPSCALE_USE_EDGE_DIRECTION: bool = true;
 override UPSCALE_EDGE_THRESHOLD: f32 = 4.0/255.0;
@@ -50,6 +58,18 @@ struct PushConstant {
     ck_channel2: vec4f,
 }
 var<push_constant> pc: PushConstant;
+
+struct GazePos {
+    left: vec2f,
+    right: vec2f,
+}
+
+struct GazeUniform {
+    gaze_pos: GazePos,
+}
+
+// Gaze comes from a GPU uniform buffer that the CPU fills every frame
+@group(0) @binding(2) var<uniform> gaze: GazeUniform; 
 
 @group(0) @binding(0) var stream_texture: texture_2d<f32>;
 @group(0) @binding(1) var stream_sampler: sampler;
@@ -238,8 +258,25 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
         alpha = mask;
     }
 
+    // Optional gaze debug marker overlay
+    if (ENABLE_GAZE_DEBUG) {
+        var gaze_uv = gaze.gaze_pos.left;
+        if (pc.view_idx == 1u) {
+            gaze_uv = gaze.gaze_pos.right;
+        }
+        let dist = distance(uv, gaze_uv);
+        let radius = GAZE_MARKER_RADIUS;
+        let feather = max(GAZE_MARKER_FEATHER, 0.0001);
+        let t = smoothstep(radius + feather, radius, dist);
+
+        let marker_col = vec3f(GAZE_MARKER_R, GAZE_MARKER_G, GAZE_MARKER_B);
+        color = color * (1.0 - t) + marker_col * t;
+        alpha = max(alpha, t);
+    }
+
     return vec4f(color, alpha);
 }
+
 
 fn chroma_key_mask(color: vec3f) -> f32 {
     let start_max = vec3f(pc.ck_channel0.x, pc.ck_channel1.x, pc.ck_channel2.x);

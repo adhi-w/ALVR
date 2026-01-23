@@ -228,6 +228,7 @@ pub struct TrackingData {
     pub device_motions: Vec<(u64, DeviceMotion)>,
     pub hand_skeletons: [Option<[Pose; 26]>; 2],
     pub face: FaceData,
+    pub gaze_uv: Option<Vec2>,
     pub body: Option<BodySkeleton>,
 }
 

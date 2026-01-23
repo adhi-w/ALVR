@@ -11,7 +11,7 @@ use alvr_common::{
     HEAD_ID, Pose, RelaxedAtomic, ViewParams,
     anyhow::Result,
     error,
-    glam::{UVec2, Vec2},
+    glam::{Quat, UVec2, Vec2, Vec3},
     parking_lot::RwLock,
 };
 use alvr_graphics::{GraphicsContext, StreamRenderer, StreamViewParams};
@@ -31,6 +31,36 @@ use std::{
 };
 
 const DECODER_MAX_TIMEOUT_MULTIPLIER: f32 = 0.8;
+
+fn project_gaze_to_uv(eyes_combined: Quat, fov: alvr_common::Fov) -> Option<Vec2> {
+    // OpenXR convention: -Z is forward.
+    let dir = (eyes_combined * Vec3::new(0.0, 0.0, -1.0)).normalize_or_zero();
+    if dir.z >= -1e-5 {
+        return None;
+    }
+
+    // Intersect ray with the plane z = -1 in view space.
+    let x_proj = dir.x / (-dir.z);
+    let y_proj = dir.y / (-dir.z);
+
+    let tanl = f32::tan(fov.left);
+    let tanr = f32::tan(fov.right);
+    let tanu = f32::tan(fov.up);
+    let tand = f32::tan(fov.down);
+
+    let width = tanr - tanl;
+    let height = tanu - tand;
+    if width.abs() < 1e-6 || height.abs() < 1e-6 {
+        return None;
+    }
+
+    // u: right, v: down (texture UV convention)
+    let u = ((x_proj - tanl) / width).clamp(0.0, 1.0);
+    let v_up = ((y_proj - tand) / height).clamp(0.0, 1.0);
+    let v = 1.0 - v_up;
+
+    Some(Vec2::new(u, v))
+}
 
 pub struct ParsedStreamConfig {
     pub view_resolution: UVec2,
@@ -97,6 +127,7 @@ pub struct StreamContext {
     config: ParsedStreamConfig,
     target_view_resolution: UVec2,
     renderer: StreamRenderer,
+    latest_gaze_uv: Arc<RwLock<Option<[Vec2; 2]>>>,
     decoder: Option<(VideoDecoderConfig, VideoDecoderSource)>,
     use_custom_reprojection: bool,
 }
@@ -228,6 +259,8 @@ impl StreamContext {
             xr::ReferenceSpaceType::VIEW,
         ));
 
+        let latest_gaze_uv = Arc::new(RwLock::new(None));
+
         let mut this = StreamContext {
             use_custom_reprojection: core_ctx.platform().is_yvr(),
             core_context: core_ctx,
@@ -242,6 +275,7 @@ impl StreamContext {
             config,
             target_view_resolution,
             renderer,
+            latest_gaze_uv,
             decoder: None,
         };
 
@@ -287,6 +321,7 @@ impl StreamContext {
             let view_reference_space = Arc::clone(&self.view_reference_space);
             let refresh_rate = self.config.refresh_rate_hint;
             let running = Arc::clone(&self.input_thread_running);
+            let latest_gaze_uv = Arc::clone(&self.latest_gaze_uv);
             move || {
                 stream_input_loop(
                     &core_ctx,
@@ -295,6 +330,7 @@ impl StreamContext {
                     &stage_reference_space,
                     &view_reference_space,
                     refresh_rate,
+                    latest_gaze_uv,
                     running,
                 )
             }
@@ -421,6 +457,8 @@ impl StreamContext {
             openxr_display_time = vsync_time;
         }
 
+        let gaze_uv = *self.latest_gaze_uv.read();
+
         self.renderer.render(
             buffer_ptr,
             [
@@ -436,6 +474,7 @@ impl StreamContext {
                 },
             ],
             self.config.passthrough.as_ref(),
+            gaze_uv,
         );
 
         self.swapchains[0].release_image().unwrap();
@@ -521,6 +560,7 @@ fn stream_input_loop(
     stage_reference_space: &xr::Space,
     view_reference_space: &xr::Space,
     refresh_rate: f32,
+    latest_gaze_uv: Arc<RwLock<Option<[Vec2; 2]>>>,
     running: Arc<RelaxedAtomic>,
 ) {
     let mut last_controller_poses = [Pose::IDENTITY; 2];
@@ -619,6 +659,19 @@ fn stream_input_loop(
             now,
         );
 
+        let gaze_uv = face
+            .eyes_combined
+            .and_then(|q| project_gaze_to_uv(q, last_view_params[0].fov));
+
+        let gaze_uv_lr = face.eyes_combined.and_then(|q| {
+            Some([
+                project_gaze_to_uv(q, last_view_params[0].fov)?,
+                project_gaze_to_uv(q, last_view_params[1].fov)?,
+            ])
+        });
+
+        *latest_gaze_uv.write() = gaze_uv_lr;
+
         let body = int_ctx
             .body_source
             .as_ref()
@@ -641,6 +694,7 @@ fn stream_input_loop(
                 right_hand_data.skeleton_joints,
             ],
             face,
+            gaze_uv,
             body,
         });
 

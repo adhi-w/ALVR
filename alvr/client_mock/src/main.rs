@@ -175,6 +175,7 @@ fn tracking_thread(
             )],
             hand_skeletons: [None, None],
             face: FaceData::default(),
+            gaze_uv: None,
             body: None,
         });
 

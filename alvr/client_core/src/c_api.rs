@@ -497,6 +497,7 @@ pub extern "C" fn alvr_send_tracking(
                 eyes_combined,
                 ..Default::default()
             },
+            gaze_uv: None,
             body: None,
         });
     }
@@ -804,6 +805,7 @@ pub extern "C" fn alvr_render_stream_opengl(
                         },
                     },
                 ],
+                None,
                 None,
             );
         }
