@@ -35,7 +35,7 @@ use alvr_sockets::StreamSender;
 use bitrate::{BitrateManager, DynamicEncoderParams};
 use statistics::StatisticsManager;
 use std::{
-    collections::HashSet,
+    collections::{HashSet, VecDeque},
     env,
     ffi::OsStr,
     fs::File,
@@ -97,6 +97,10 @@ pub struct ConnectionContext {
     statistics_manager: RwLock<Option<StatisticsManager>>,
     bitrate_manager: Mutex<BitrateManager>,
     tracking_manager: RwLock<TrackingManager>,
+    last_received_foveation_center_shift: RwLock<Option<[Vec2; 2]>>,
+    // Per-frame snapshot of the center shift actually used by the server foveation shader.
+    // Keyed by the same timestamp carried by the encoded frame.
+    foveation_center_shift_used_queue: Mutex<VecDeque<(Duration, [Vec2; 2])>>,
     decoder_config: Mutex<Option<DecoderInitializationConfig>>,
     video_mirror_sender: Mutex<Option<broadcast::Sender<Vec<u8>>>>,
     video_recording_file: Mutex<Option<File>>,
@@ -208,6 +212,8 @@ impl ServerCoreContext {
             tracking_manager: RwLock::new(TrackingManager::new(
                 initial_settings.connection.statistics_history_size,
             )),
+            last_received_foveation_center_shift: RwLock::new(None),
+            foveation_center_shift_used_queue: Mutex::new(VecDeque::new()),
             decoder_config: Mutex::new(None),
             video_mirror_sender: Mutex::new(None),
             video_recording_file: Mutex::new(None),
@@ -308,6 +314,26 @@ impl ServerCoreContext {
             .as_ref()
             .map(|stats| stats.tracker_pose_time_offset())
             .unwrap_or_default()
+    }
+
+    pub fn get_last_received_foveation_center_shift(&self) -> Option<[Vec2; 2]> {
+        *self.connection_context
+            .last_received_foveation_center_shift
+            .read()
+    }
+
+    pub fn report_foveation_center_shift_used(&self, timestamp: Duration, shift: [Vec2; 2]) {
+        let mut queue = self.connection_context.foveation_center_shift_used_queue.lock();
+
+        if queue.back().is_some_and(|(ts, _)| *ts == timestamp) {
+            queue.pop_back();
+        }
+
+        queue.push_back((timestamp, shift));
+
+        while queue.len() > 512 {
+            queue.pop_front();
+        }
     }
 
     pub fn send_haptics(&self, haptics: Haptics) {
@@ -428,6 +454,12 @@ impl ServerCoreContext {
                         timestamp,
                         global_view_params,
                         is_idr,
+                        center_shift: self
+                            .connection_context
+                            .foveation_center_shift_used_queue
+                            .lock()
+                            .iter()
+                            .find_map(|(ts, shift)| (*ts == timestamp).then_some(*shift)),
                     },
                     payload: nal_buffer,
                 });

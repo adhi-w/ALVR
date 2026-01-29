@@ -29,6 +29,11 @@ public:
     float m_foveationCenterSizeY;
     float m_foveationCenterShiftX;
     float m_foveationCenterShiftY;
+    // Per-eye overrides (normalized [0,1], x:right, y:down). Defaults to the generic values.
+    float m_foveationCenterShiftXLeft;
+    float m_foveationCenterShiftYLeft;
+    float m_foveationCenterShiftXRight;
+    float m_foveationCenterShiftYRight;
     float m_foveationEdgeRatioX;
     float m_foveationEdgeRatioY;
 

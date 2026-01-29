@@ -51,6 +51,11 @@ void Settings::Load() {
         m_foveationCenterSizeY = (float)config.get("foveation_center_size_y").get<double>();
         m_foveationCenterShiftX = (float)config.get("foveation_center_shift_x").get<double>();
         m_foveationCenterShiftY = (float)config.get("foveation_center_shift_y").get<double>();
+        // Per-eye foveation shift defaults to the generic value.
+        m_foveationCenterShiftXLeft = m_foveationCenterShiftX;
+        m_foveationCenterShiftYLeft = m_foveationCenterShiftY;
+        m_foveationCenterShiftXRight = m_foveationCenterShiftX;
+        m_foveationCenterShiftYRight = m_foveationCenterShiftY;
         m_foveationEdgeRatioX = (float)config.get("foveation_edge_ratio_x").get<double>();
         m_foveationEdgeRatioY = (float)config.get("foveation_edge_ratio_y").get<double>();
 

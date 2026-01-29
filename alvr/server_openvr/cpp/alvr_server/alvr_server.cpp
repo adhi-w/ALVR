@@ -217,6 +217,13 @@ void (*ShutdownRuntime)();
 unsigned long long (*PathStringToHash)(const char* path);
 void (*ReportPresent)(unsigned long long timestamp_ns, unsigned long long offset_ns);
 void (*ReportComposed)(unsigned long long timestamp_ns, unsigned long long offset_ns);
+void (*ReportFoveationCenterShiftUsed)(
+    unsigned long long targetTimestampNs,
+    float leftShiftX,
+    float leftShiftY,
+    float rightShiftX,
+    float rightShiftY
+);
 FfiDynamicEncoderParams (*GetDynamicEncoderParams)();
 unsigned long long (*GetSerialNumber)(unsigned long long deviceID, char* outString);
 void (*SetOpenvrProps)(void* instancePtr, unsigned long long deviceID);
@@ -523,6 +530,22 @@ void SetProximityState(bool headset_is_worn) {
 
 void SetChaperoneArea(float areaWidth, float areaHeight) {
     _SetChaperoneArea(areaWidth, areaHeight);
+}
+
+void SetFoveationCenterShift(
+    float centerShiftXLeft,
+    float centerShiftYLeft,
+    float centerShiftXRight,
+    float centerShiftYRight
+) {
+    Settings::Instance().m_foveationCenterShiftXLeft = centerShiftXLeft;
+    Settings::Instance().m_foveationCenterShiftYLeft = centerShiftYLeft;
+    Settings::Instance().m_foveationCenterShiftXRight = centerShiftXRight;
+    Settings::Instance().m_foveationCenterShiftYRight = centerShiftYRight;
+
+    // Keep the generic fields as a reasonable fallback/average.
+    Settings::Instance().m_foveationCenterShiftX = (centerShiftXLeft + centerShiftXRight) * 0.5f;
+    Settings::Instance().m_foveationCenterShiftY = (centerShiftYLeft + centerShiftYRight) * 0.5f;
 }
 
 void CaptureFrame() {

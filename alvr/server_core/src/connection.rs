@@ -20,8 +20,9 @@ use alvr_common::{
 use alvr_events::{AdbEvent, ButtonEvent, EventType};
 use alvr_packets::{
     AUDIO, ClientConnectionResult, ClientConnectionsAction, ClientControlPacket, ClientStatistics,
-    HAPTICS, NegotiatedStreamingConfig, NegotiatedStreamingConfigExt, RealTimeConfig, STATISTICS,
-    ServerControlPacket, StreamConfigPacket, TRACKING, TrackingData, VIDEO, VideoPacketHeader,
+    HAPTICS, NegotiatedStreamingConfig, NegotiatedStreamingConfigExt, RealTimeConfig,
+    STATISTICS, ServerControlPacket, StreamConfigPacket, TRACKING, TrackingData, VIDEO,
+    VideoPacketHeader,
 };
 use alvr_session::{
     BodyTrackingSinkConfig, CodecType, ControllersEmulationMode, FrameSize, H264Profile,
@@ -814,6 +815,8 @@ fn connection_pipeline(
     }
     dbg_connection!("connection_pipeline: Got StreamReady packet");
 
+    let control_sender = Arc::new(Mutex::new(control_sender));
+
     *ctx.statistics_manager.write() = Some(StatisticsManager::new(
         initial_settings.connection.statistics_history_size,
         Duration::from_secs_f32(1.0 / fps),
@@ -1093,8 +1096,6 @@ fn connection_pipeline(
         }
     });
 
-    let control_sender = Arc::new(Mutex::new(control_sender));
-
     let real_time_update_thread = thread::spawn({
         let control_sender = Arc::clone(&control_sender);
         let client_hostname = client_hostname.clone();
@@ -1299,6 +1300,20 @@ fn connection_pipeline(
                     }
                     ClientControlPacket::Log { level, message } => {
                         info!("Client {client_hostname}: [{level:?}] {message}")
+                    }
+                    ClientControlPacket::Gaze(packet) => {
+                        let shift = [
+                            Vec2::new(
+                                packet.gaze_uv[0].x.clamp(0.0, 1.0),
+                                packet.gaze_uv[0].y.clamp(0.0, 1.0),
+                            ),
+                            Vec2::new(
+                                packet.gaze_uv[1].x.clamp(0.0, 1.0),
+                                packet.gaze_uv[1].y.clamp(0.0, 1.0),
+                            ),
+                        ];
+
+                        *ctx.last_received_foveation_center_shift.write() = Some(shift);
                     }
                     ClientControlPacket::KeepAlive | ClientControlPacket::StreamReady => (),
                     ClientControlPacket::ProximityState(headset_is_worn) => {

@@ -497,7 +497,6 @@ pub extern "C" fn alvr_send_tracking(
                 eyes_combined,
                 ..Default::default()
             },
-            gaze_uv: None,
             body: None,
         });
     }
@@ -552,7 +551,7 @@ pub extern "C" fn alvr_report_compositor_start(
     out_view_params: *mut AlvrViewParams,
 ) {
     if let Some(context) = &*CLIENT_CORE_CONTEXT.lock() {
-        let view_params =
+        let (view_params, _center_shift) =
             context.report_compositor_start(Duration::from_nanos(target_timestamp_ns));
 
         unsafe {
@@ -805,6 +804,7 @@ pub extern "C" fn alvr_render_stream_opengl(
                         },
                     },
                 ],
+                None,
                 None,
                 None,
             );

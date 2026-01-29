@@ -134,6 +134,17 @@ extern "C" void (*ShutdownRuntime)();
 extern "C" unsigned long long (*PathStringToHash)(const char* path);
 extern "C" void (*ReportPresent)(unsigned long long timestamp_ns, unsigned long long offset_ns);
 extern "C" void (*ReportComposed)(unsigned long long timestamp_ns, unsigned long long offset_ns);
+
+// Report the per-eye foveated encoding center shift actually used for a specific frame.
+// Normalized [0,1], x:right, y:down. Timestamp matches VideoSend targetTimestampNs.
+extern "C" void (*ReportFoveationCenterShiftUsed)(
+    unsigned long long targetTimestampNs,
+    float leftShiftX,
+    float leftShiftY,
+    float rightShiftX,
+    float rightShiftY
+);
+
 extern "C" FfiDynamicEncoderParams (*GetDynamicEncoderParams)();
 extern "C" unsigned long long (*GetSerialNumber)(unsigned long long deviceID, char* outString);
 extern "C" void (*SetOpenvrProps)(void* instancePtr, unsigned long long deviceID);
@@ -157,6 +168,14 @@ extern "C" void SetTracking(
 );
 extern "C" void RequestDriverResync();
 extern "C" void ShutdownSteamvr();
+
+// Runtime override for per-eye foveated encoding center shift (normalized [0,1], x:right, y:down).
+extern "C" void SetFoveationCenterShift(
+    float leftShiftX,
+    float leftShiftY,
+    float rightShiftX,
+    float rightShiftY
+);
 
 extern "C" void SetOpenvrProperty(void* instancePtr, FfiOpenvrProperty prop);
 extern "C" void SetOpenvrPropByDeviceID(unsigned long long deviceID, FfiOpenvrProperty prop);

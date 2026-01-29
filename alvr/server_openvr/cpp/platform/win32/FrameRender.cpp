@@ -559,6 +559,7 @@ bool FrameRender::RenderFrame(
     vr::HmdMatrix34_t poses[],
     int layerCount,
     bool recentering,
+    uint64_t targetTimestampNs,
     const std::string& message,
     const std::string& debugText
 ) {
@@ -870,7 +871,7 @@ bool FrameRender::RenderFrame(
     }
 
     if (enableFFE) {
-        m_ffr->Render();
+        m_ffr->Render(targetTimestampNs);
     }
 
     if (Settings::Instance().m_enableHdr) {

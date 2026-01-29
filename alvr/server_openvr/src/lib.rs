@@ -17,6 +17,7 @@ use bindings::*;
 use alvr_common::{
     BUTTON_INFO, HAND_LEFT_ID, HAND_RIGHT_ID, HAND_TRACKER_LEFT_ID, HAND_TRACKER_RIGHT_ID, HEAD_ID,
     Pose, ViewParams, error,
+    glam::Vec2,
     parking_lot::{Mutex, RwLock},
     settings_schema::Switch,
     warn,
@@ -95,6 +96,20 @@ fn event_loop(events_receiver: mpsc::Receiver<ServerCoreEvent>) {
                         .is_some_and(|c| c.detached_controllers_steamvr_sink);
 
                     if let Some(context) = &*SERVER_CORE_CONTEXT.read() {
+                        if let Some([shift_uv_left, shift_uv_right]) =
+                            context.get_last_received_foveation_center_shift()
+                        {
+                            // Normalized [0,1] (u:right, v:down)
+                            unsafe {
+                                SetFoveationCenterShift(
+                                    shift_uv_left.x,
+                                    shift_uv_left.y,
+                                    shift_uv_right.x,
+                                    shift_uv_right.y,
+                                )
+                            };
+                        }
+
                         let target_timestamp =
                             poll_timestamp + context.get_motion_to_photon_latency();
                         let controllers_pose_time_offset = context.get_tracker_pose_time_offset();
@@ -436,6 +451,23 @@ extern "C" fn report_present(timestamp_ns: u64, offset_ns: u64) {
     }
 }
 
+extern "C" fn report_foveation_center_shift_used(
+    timestamp_ns: u64,
+    left_shift_x: f32,
+    left_shift_y: f32,
+    right_shift_x: f32,
+    right_shift_y: f32,
+) {
+    if let Some(context) = &*SERVER_CORE_CONTEXT.read() {
+        let shift = [
+            Vec2::new(left_shift_x, left_shift_y),
+            Vec2::new(right_shift_x, right_shift_y),
+        ];
+
+        context.report_foveation_center_shift_used(Duration::from_nanos(timestamp_ns), shift);
+    }
+}
+
 extern "C" fn wait_for_vsync() {
     // Default 120Hz-ish wait if StatisticsManager isn't up.
     // We use 120Hz-ish so that SteamVR doesn't accidentally get
@@ -543,6 +575,7 @@ pub unsafe extern "C" fn HmdDriverFactory(
             GetDynamicEncoderParams = Some(get_dynamic_encoder_params);
             ReportComposed = Some(report_composed);
             ReportPresent = Some(report_present);
+            ReportFoveationCenterShiftUsed = Some(report_foveation_center_shift_used);
             WaitForVSync = Some(wait_for_vsync);
             ShutdownRuntime = Some(shutdown_driver);
 

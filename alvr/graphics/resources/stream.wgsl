@@ -14,6 +14,15 @@ override GAZE_MARKER_R: f32 = 1.0;
 override GAZE_MARKER_G: f32 = 0.0;
 override GAZE_MARKER_B: f32 = 0.0;
 
+// Debug center-shift marker (FFR): draws a circle at the server-provided per-frame center shift.
+override ENABLE_CENTER_SHIFT_DEBUG: bool = true;
+override CENTER_SHIFT_MARKER_RADIUS: f32 = 0.002;
+override CENTER_SHIFT_MARKER_FEATHER: f32 = 0.001;
+// Blue marker
+override CENTER_SHIFT_MARKER_R: f32 = 0.0;
+override CENTER_SHIFT_MARKER_G: f32 = 0.0;
+override CENTER_SHIFT_MARKER_B: f32 = 1.0;
+
 override ENABLE_UPSCALING: bool = false;
 override UPSCALE_USE_EDGE_DIRECTION: bool = true;
 override UPSCALE_EDGE_THRESHOLD: f32 = 4.0/255.0;
@@ -46,6 +55,8 @@ override B_RIGHT_X: f32 = 0.0;
 override B_RIGHT_Y: f32 = 0.0;
 override C_RIGHT_X: f32 = 0.0;
 override C_RIGHT_Y: f32 = 0.0;
+override CENTER_SIZE_X: f32 = 0.0;
+override CENTER_SIZE_Y: f32 = 0.0;
 
 struct PushConstant {
     reprojection_transform: mat4x4f,
@@ -64,12 +75,13 @@ struct GazePos {
     right: vec2f,
 }
 
-struct GazeUniform {
+struct DebugUniform {
     gaze_pos: GazePos,
+    center_shift_pos: GazePos,
 }
 
 // Gaze comes from a GPU uniform buffer that the CPU fills every frame
-@group(0) @binding(2) var<uniform> gaze: GazeUniform; 
+@group(0) @binding(2) var<uniform> dbg: DebugUniform;
 
 @group(0) @binding(0) var stream_texture: texture_2d<f32>;
 @group(0) @binding(1) var stream_sampler: sampler;
@@ -171,20 +183,24 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
         }
     } */
 
-            var EdgeRatio = vec2f(2.0, 2.0);
-            var CenterSize = vec2f(0.2, 0.2);   
-            var CenterShift = vec2f(0.6, 0.5);
+            // let EdgeRatio = vec2f(2.0, 2.0);
+            // let CenterSize = vec2f(0.4, 0.4);   
+            // let CenterShift = vec2f(0.6, 0.5);
+
+            let EdgeRatio = vec2f(EDGE_X_RATIO, EDGE_Y_RATIO);
+            let CenterSize = vec2f(CENTER_SIZE_X, CENTER_SIZE_Y);
 
             var CenterSizeOwn = CenterSize;
             var PeripheralNewScreenSpace = (vec2f(1.0, 1.0) / (EdgeRatio + vec2f(1.0, 1.0))) / 2.0;
             var CenterSizeNewScreenSpace = EdgeRatio / (EdgeRatio + vec2f(1.0, 1.0));
-            var CenterShiftOwn = CenterShift;
+            var CenterShiftOwn = dbg.center_shift_pos.left;
 
             var isRightEye: f32 = f32(pc.view_idx);
 
             // Re-scale to -1..1 for center shift handling
-            if (isRightEye == 1.0) {                
-                CenterShiftOwn.x = 1.0 - CenterShiftOwn.x;
+            if (isRightEye == 1.0) {     
+                CenterShiftOwn = dbg.center_shift_pos.right;          
+                //CenterShiftOwn.x = 1.0 - CenterShiftOwn.x; // this is unnecessary because right eye can use its independent center shift in multiview frames.
             }
             CenterShiftOwn.y = 1.0 - CenterShiftOwn.y;
             CenterShiftOwn.x = 2.0 * CenterShiftOwn.x - 1.0;
@@ -260,9 +276,9 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
 
     // Optional gaze debug marker overlay
     if (ENABLE_GAZE_DEBUG) {
-        var gaze_uv = gaze.gaze_pos.left;
+        var gaze_uv = dbg.gaze_pos.left;
         if (pc.view_idx == 1u) {
-            gaze_uv = gaze.gaze_pos.right;
+            gaze_uv = dbg.gaze_pos.right;
         }
         let dist = distance(uv, gaze_uv);
         let radius = GAZE_MARKER_RADIUS;
@@ -270,6 +286,26 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
         let t = smoothstep(radius + feather, radius, dist);
 
         let marker_col = vec3f(GAZE_MARKER_R, GAZE_MARKER_G, GAZE_MARKER_B);
+        color = color * (1.0 - t) + marker_col * t;
+        alpha = max(alpha, t);
+    }
+
+    // Optional center-shift debug marker overlay (blue)
+    if (ENABLE_CENTER_SHIFT_DEBUG) {
+        var cs_uv = dbg.center_shift_pos.left;
+        if (pc.view_idx == 1u) {
+            cs_uv = dbg.center_shift_pos.right;
+        }
+        let dist = distance(uv, cs_uv);
+        let radius = CENTER_SHIFT_MARKER_RADIUS;
+        let feather = max(CENTER_SHIFT_MARKER_FEATHER, 0.0001);
+        let t = smoothstep(radius + feather, radius, dist);
+
+        let marker_col = vec3f(
+            CENTER_SHIFT_MARKER_R,
+            CENTER_SHIFT_MARKER_G,
+            CENTER_SHIFT_MARKER_B,
+        );
         color = color * (1.0 - t) + marker_col * t;
         alpha = max(alpha, t);
     }

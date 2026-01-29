@@ -73,6 +73,13 @@ impl StreamRenderer {
 
         let target_format = super::gl_format_to_wgpu(target_format);
 
+        let gaze_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: 32, // 4 * vec2<f32>: gaze (L/R) + center_shift (L/R)
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+
         let bind_group_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
             label: None,
             entries: &[
@@ -98,7 +105,7 @@ impl StreamRenderer {
                     ty: BindingType::Buffer {
                         ty: BufferBindingType::Uniform,
                         has_dynamic_offset: false,
-                        min_binding_size: None,
+                        min_binding_size: Some(wgpu::BufferSize::new(32).unwrap()),
                     },
                     count: None,
                 },
@@ -188,13 +195,6 @@ impl StreamRenderer {
             ..Default::default()
         });
 
-        let gaze_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: 16, // vec2<f32> + padding
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-
         let mut view_objects = vec![];
         let mut staging_textures_gl = vec![];
         for target_swapchain in &swapchain_textures {
@@ -271,20 +271,41 @@ impl StreamRenderer {
         hardware_buffer: *mut c_void,
         view_params: [StreamViewParams; 2],
         passthrough: Option<&PassthroughMode>,
-        gaze_uv: Option<[Vec2; 2]>,
+        gaze_uv: Option<[Vec2; 2]>,        
+        center_shift_uv: Option<[Vec2; 2]>,
     ) {
         // if hardware_buffer is available copy stream to staging texture
         if !hardware_buffer.is_null() {
             self.staging_renderer.render(hardware_buffer);
         }
 
-        let gaze_uv = gaze_uv.unwrap_or([Vec2::new(0.5, 0.5), Vec2::new(0.5, 0.5)]);
+        /* let gaze_uv = gaze_uv.unwrap_or([Vec2::new(0.5, 0.5), Vec2::new(0.5, 0.5)]);
         let mut gaze_bytes = [0u8; 16];
         gaze_bytes[0..4].copy_from_slice(&gaze_uv[0].x.to_le_bytes());
         gaze_bytes[4..8].copy_from_slice(&gaze_uv[0].y.to_le_bytes());
         gaze_bytes[8..12].copy_from_slice(&gaze_uv[1].x.to_le_bytes());
-        gaze_bytes[12..16].copy_from_slice(&gaze_uv[1].y.to_le_bytes());
-        self.context.queue.write_buffer(&self.gaze_buffer, 0, &gaze_bytes);
+        gaze_bytes[12..16].copy_from_slice(&gaze_uv[1].y.to_le_bytes()); 
+        self.context.queue.write_buffer(&self.gaze_buffer, 0, &gaze_bytes);*/
+
+        let gaze_uv = gaze_uv.unwrap_or([Vec2::new(0.5, 0.5), Vec2::new(0.5, 0.5)]);
+        let center_shift_uv =
+            center_shift_uv.unwrap_or([Vec2::new(0.5, 0.5), Vec2::new(0.5, 0.5)]);
+
+        let mut bytes = [0u8; 32];
+
+        // gaze left/right
+        bytes[0..4].copy_from_slice(&gaze_uv[0].x.to_le_bytes());
+        bytes[4..8].copy_from_slice(&gaze_uv[0].y.to_le_bytes());
+        bytes[8..12].copy_from_slice(&gaze_uv[1].x.to_le_bytes());
+        bytes[12..16].copy_from_slice(&gaze_uv[1].y.to_le_bytes());
+
+        // center shift left/right
+        bytes[16..20].copy_from_slice(&center_shift_uv[0].x.to_le_bytes());
+        bytes[20..24].copy_from_slice(&center_shift_uv[0].y.to_le_bytes());
+        bytes[24..28].copy_from_slice(&center_shift_uv[1].x.to_le_bytes());
+        bytes[28..32].copy_from_slice(&center_shift_uv[1].y.to_le_bytes());
+
+        self.context.queue.write_buffer(&self.gaze_buffer, 0, &bytes);
 
         let mut encoder = self
             .context
@@ -541,6 +562,8 @@ pub fn foveated_encoding_shader_constants(
         ("B_RIGHT_Y", b_right.y),
         ("C_RIGHT_X", c_right.x),
         ("C_RIGHT_Y", c_right.y),
+        ("CENTER_SIZE_X", center_size_aligned.x),
+        ("CENTER_SIZE_Y", center_size_aligned.y),
     ]
     .iter()
     .map(|(k, v)| (*k, *v as f64))

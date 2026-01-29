@@ -15,7 +15,7 @@ use alvr_common::{
     parking_lot::RwLock,
 };
 use alvr_graphics::{GraphicsContext, StreamRenderer, StreamViewParams};
-use alvr_packets::{RealTimeConfig, StreamConfig, TrackingData};
+use alvr_packets::{GazePacket, RealTimeConfig, StreamConfig, TrackingData};
 use alvr_session::{
     ClientsideFoveationConfig, ClientsideFoveationMode, ClientsidePostProcessingConfig, CodecType,
     FoveatedEncodingConfig, MediacodecProperty, PassthroughMode, UpscalingConfig,
@@ -392,15 +392,16 @@ impl StreamContext {
             }
         }
 
-        let (timestamp, view_params, buffer_ptr) =
+        let (timestamp, view_params, buffer_ptr, center_shift_uv) =
             if let Some((timestamp, buffer_ptr)) = frame_result {
-                let view_params = self.core_context.report_compositor_start(timestamp);
+                let (view_params, center_shift_uv) =
+                    self.core_context.report_compositor_start(timestamp);
 
                 self.last_good_view_params = view_params;
 
-                (timestamp, view_params, buffer_ptr)
+                (timestamp, view_params, buffer_ptr, center_shift_uv)
             } else {
-                (vsync_time, self.last_good_view_params, ptr::null_mut())
+                (vsync_time, self.last_good_view_params, ptr::null_mut(), None)
             };
 
         let left_swapchain_idx = self.swapchains[0].acquire_image().unwrap();
@@ -475,6 +476,7 @@ impl StreamContext {
             ],
             self.config.passthrough.as_ref(),
             gaze_uv,
+            center_shift_uv,
         );
 
         self.swapchains[0].release_image().unwrap();
@@ -659,10 +661,6 @@ fn stream_input_loop(
             now,
         );
 
-        let gaze_uv = face
-            .eyes_combined
-            .and_then(|q| project_gaze_to_uv(q, last_view_params[0].fov));
-
         let gaze_uv_lr = face.eyes_combined.and_then(|q| {
             Some([
                 project_gaze_to_uv(q, last_view_params[0].fov)?,
@@ -671,6 +669,18 @@ fn stream_input_loop(
         });
 
         *latest_gaze_uv.write() = gaze_uv_lr;
+
+        if let Some(gaze_uv) = gaze_uv_lr {
+            let center = Vec2::new(0.5, 0.5);
+            let m0 = gaze_uv[0].distance(center);
+            let m1 = gaze_uv[1].distance(center);
+
+            core_ctx.send_gaze(GazePacket {
+                timestamp: target_time,
+                gaze_uv,
+                gaze_magnitude: [m0, m1],
+            });
+        }
 
         let body = int_ctx
             .body_source
@@ -694,7 +704,6 @@ fn stream_input_loop(
                 right_hand_data.skeleton_joints,
             ],
             face,
-            gaze_uv,
             body,
         });
 

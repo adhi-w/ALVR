@@ -24,7 +24,8 @@ use alvr_common::{
     warn,
 };
 use alvr_packets::{
-    BatteryInfo, ButtonEntry, ClientControlPacket, RealTimeConfig, StreamConfig, TrackingData,
+    BatteryInfo, ButtonEntry, ClientControlPacket, GazePacket, RealTimeConfig, StreamConfig,
+    TrackingData,
 };
 use alvr_session::CodecType;
 use alvr_system_info::Platform;
@@ -228,6 +229,14 @@ impl ClientCoreContext {
         }
     }
 
+    pub fn send_gaze(&self, packet: GazePacket) {
+        dbg_client_core!("send_gaze");
+
+        if let Some(sender) = &mut *self.connection_context.control_sender.lock() {
+            sender.send(&ClientControlPacket::Gaze(packet)).ok();
+        }
+    }
+
     pub fn send_proximity_state(&self, headset_is_worn: bool) {
         if let Some(sender) = &mut *self.connection_context.control_sender.lock() {
             sender
@@ -275,7 +284,10 @@ impl ClientCoreContext {
         *self.connection_context.state.write() = ConnectionState::Disconnecting;
     }
 
-    pub fn report_compositor_start(&self, timestamp: Duration) -> [ViewParams; 2] {
+    pub fn report_compositor_start(
+        &self,
+        timestamp: Duration,
+    ) -> ([ViewParams; 2], Option<[Vec2; 2]>) {
         dbg_client_core!("report_compositor_start");
 
         if let Some(stats) = &mut *self.connection_context.statistics_manager.lock() {
@@ -290,7 +302,15 @@ impl ClientCoreContext {
             }
         }
 
-        *global_view_params_lock
+        let mut center_shift = None;
+        for (ts, shift) in &*self.connection_context.ffr_center_shift_queue.lock() {
+            if *ts == timestamp {
+                center_shift = Some(*shift);
+                break;
+            }
+        }
+
+        (*global_view_params_lock, center_shift)
     }
 
     pub fn report_submit(&self, timestamp: Duration, vsync_queue: Duration) {

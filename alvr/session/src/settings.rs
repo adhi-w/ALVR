@@ -1841,12 +1841,12 @@ pub fn session_settings_default() -> SettingsDefault {
                 content: FoveatedEncodingConfigDefault {
                     gui_collapsed: true,
                     force_enable: false,
-                    center_size_x: 0.45,
-                    center_size_y: 0.4,
-                    center_shift_x: 0.4,
-                    center_shift_y: 0.1,
-                    edge_ratio_x: 4.,
-                    edge_ratio_y: 5.,
+                    center_size_x: 0.3,
+                    center_size_y: 0.3,
+                    center_shift_x: 0.5,
+                    center_shift_y: 0.5,
+                    edge_ratio_x: 2.0,
+                    edge_ratio_y: 2.0,
                 },
             },
             clientside_foveation: SwitchDefault {

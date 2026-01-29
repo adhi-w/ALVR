@@ -156,6 +156,7 @@ pub enum ServerControlPacket {
     Restarting,
     KeepAlive,
     RealTimeConfig(RealTimeConfig),
+    FFR(FFRPacket),
     Reserved(String),
     ReservedBuffer(Vec<u8>),
 }
@@ -198,8 +199,25 @@ pub enum ClientControlPacket {
         message: String,
     },
     ProximityState(bool),
+    Gaze(GazePacket),
     Reserved(String),
     ReservedBuffer(Vec<u8>),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GazePacket {
+    pub timestamp: Duration,
+    // Per-eye normalized UV in [0,1], in texture UV convention (u: right, v: down)
+    pub gaze_uv: [Vec2; 2],
+    // Per-eye gaze magnitude in UV units (distance from (0.5, 0.5)).
+    pub gaze_magnitude: [f32; 2],
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct FFRPacket {
+    pub timestamp: Duration,
+    // Per-eye normalized center shift in [0,1] (u: right, v: down)
+    pub center_shift: [Vec2; 2],
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -228,7 +246,6 @@ pub struct TrackingData {
     pub device_motions: Vec<(u64, DeviceMotion)>,
     pub hand_skeletons: [Option<[Pose; 26]>; 2],
     pub face: FaceData,
-    pub gaze_uv: Option<Vec2>,
     pub body: Option<BodySkeleton>,
 }
 
@@ -237,6 +254,9 @@ pub struct VideoPacketHeader {
     pub timestamp: Duration,
     pub global_view_params: [ViewParams; 2],
     pub is_idr: bool,
+    // Per-eye normalized center shift in [0,1] (u: right, v: down). When None, no gaze-based
+    // center shift should be applied.
+    pub center_shift: Option<[Vec2; 2]>,
 }
 
 #[derive(Serialize, Deserialize)]
