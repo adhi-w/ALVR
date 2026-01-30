@@ -20,6 +20,8 @@ struct FoveationVars {
 
     float centerSizeX;
     float centerSizeY;
+    float centerShiftX;
+    float centerShiftY;
     float centerShiftXLeft;
     float centerShiftYLeft;
     float centerShiftXRight;
@@ -28,9 +30,7 @@ struct FoveationVars {
     float edgeRatioY;
 
     // D3D11 constant buffers must be sized to a multiple of 16 bytes.
-    // The matching HLSL cbuffer packs to 4 float4 registers (64 bytes), so we pad here.
-    float _padding0;
-    float _padding1;
+    // The matching HLSL cbuffer packs to 4 float4 registers (64 bytes).
 };
 
 FoveationVars CalculateFoveationVars() {
@@ -48,6 +48,8 @@ FoveationVars CalculateFoveationVars() {
 
     float centerSizeX = (float)Settings::Instance().m_foveationCenterSizeX;
     float centerSizeY = (float)Settings::Instance().m_foveationCenterSizeY;
+    float centerShiftX = (float)Settings::Instance().m_foveationCenterShiftX;
+    float centerShiftY = (float)Settings::Instance().m_foveationCenterShiftY;
     float centerShiftXLeft = (float)Settings::Instance().m_foveationCenterShiftXLeft;
     float centerShiftYLeft = (float)Settings::Instance().m_foveationCenterShiftYLeft;
     float centerShiftXRight = (float)Settings::Instance().m_foveationCenterShiftXRight;
@@ -65,6 +67,11 @@ FoveationVars CalculateFoveationVars() {
 
     float edgeSizeXAligned = targetEyeWidth - centerSizeXAligned * targetEyeWidth;
     float edgeSizeYAligned = targetEyeHeight - centerSizeYAligned * targetEyeHeight;
+
+    float centerShiftXAligned = ceil(centerShiftX * edgeSizeXAligned / (edgeRatioX * 2.))
+        * (edgeRatioX * 2.) / edgeSizeXAligned;
+    float centerShiftYAligned = ceil(centerShiftY * edgeSizeYAligned / (edgeRatioY * 2.))
+        * (edgeRatioY * 2.) / edgeSizeYAligned;
 
     float centerShiftXAlignedLeft = ceil(centerShiftXLeft * edgeSizeXAligned / (edgeRatioX * 2.))
         * (edgeRatioX * 2.) / edgeSizeXAligned;
@@ -97,14 +104,15 @@ FoveationVars CalculateFoveationVars() {
              eyeHeightRatioAligned,
              centerSizeXAligned,
              centerSizeYAligned,
+             centerShiftXAligned,
+             centerShiftYAligned,
              centerShiftXAlignedLeft,
              centerShiftYAlignedLeft,
              centerShiftXAlignedRight,
              centerShiftYAlignedRight,
              edgeRatioX,
-             edgeRatioY,
-             0.0f,
-             0.0f };
+             edgeRatioY
+            };
 }
 }
 
@@ -136,7 +144,7 @@ void FFR::Initialize(ID3D11Texture2D* compositionTexture) {
     );
 
      if (Settings::Instance().m_enableFoveatedEncoding) {
-    /*    std::vector<uint8_t> compressAxisAlignedShaderCSO(
+        std::vector<uint8_t> compressAxisAlignedShaderCSO(
             COMPRESS_AXIS_ALIGNED_CSO_PTR,
             COMPRESS_AXIS_ALIGNED_CSO_PTR + COMPRESS_AXIS_ALIGNED_CSO_LEN
         );
@@ -146,12 +154,12 @@ void FFR::Initialize(ID3D11Texture2D* compositionTexture) {
             mQuadVertexShader.Get(),
             compressAxisAlignedShaderCSO,
             mOptimizedTexture.Get(),
-            foveatedRenderingBuffer.Get()
+            mFoveatedRenderingBuffer.Get()
         );
 
-        mPipelines.push_back(compressAxisAlignedPipeline); */
+        mPipelines.push_back(compressAxisAlignedPipeline); 
 
-        std::vector<uint8_t> AADTCSO(
+        /* std::vector<uint8_t> AADTCSO(
             AADT2_CSO_PTR,
             AADT2_CSO_PTR + AADT2_CSO_LEN
         );
@@ -164,7 +172,7 @@ void FFR::Initialize(ID3D11Texture2D* compositionTexture) {
             mFoveatedRenderingBuffer.Get()
         );
 
-        mPipelines.push_back(AADT2Pipeline);
+        mPipelines.push_back(AADT2Pipeline); */
     } else {
         mOptimizedTexture = compositionTexture;
     }

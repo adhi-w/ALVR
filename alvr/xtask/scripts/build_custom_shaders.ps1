@@ -1,6 +1,8 @@
 # Requires: Windows SDK (fxc.exe) installed
 # Compiles custom HLSL foveation pixel shaders to .cso used by ALVR (Win32 D3D11)
 # Outputs: AADT2PixelShader.cso, AADT3PixelShader.cso, FRWPixelShader.cso
+# To build, run this script in terminal (edit the path as needed):
+# Set-Location -Path 'D:\ResearchProjects\ALVR\alvr\xtask\scripts'; Set-ExecutionPolicy RemoteSigned -Scope Process -Force; .\build_custom_shaders.ps1
 # Written by [AW]
 
 Set-StrictMode -Version Latest
@@ -33,6 +35,7 @@ $fxc = Find-Fxc
 Write-Host "Using fxc: $fxc"
 
 $items = @(
+    # @{ in = 'CompressAxisAlignedPixelShader.hlsl'; out = 'CompressAxisAlignedPixelShader.cso'   ; entry = 'main'; profile = 'ps_5_0' }
     @{ in = 'AADT2PixelShader.hlsl'; out = 'AADT2PixelShader.cso'; entry = 'main'; profile = 'ps_5_0' }
     # @{ in = 'AADT3PixelShader.hlsl'; out = 'AADT3PixelShader.cso'; entry = 'main'; profile = 'ps_5_0' },
     # @{ in = 'FRWPixelShader.hlsl'  ; out = 'FRWPixelShader.cso'  ; entry = 'main'; profile = 'ps_5_0' }
