@@ -280,6 +280,8 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
         if (pc.view_idx == 1u) {
             gaze_uv = dbg.gaze_pos.right;
         }
+        gaze_uv.y = 1.0 - gaze_uv.y; // Flip Y for texture UV space
+
         let dist = distance(uv, gaze_uv);
         let radius = GAZE_MARKER_RADIUS;
         let feather = max(GAZE_MARKER_FEATHER, 0.0001);
@@ -296,6 +298,8 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
         if (pc.view_idx == 1u) {
             cs_uv = dbg.center_shift_pos.right;
         }
+        cs_uv.y = 1.0 - cs_uv.y; // Flip Y for texture UV space
+        
         let dist = distance(uv, cs_uv);
         let radius = CENTER_SHIFT_MARKER_RADIUS;
         let feather = max(CENTER_SHIFT_MARKER_FEATHER, 0.0001);

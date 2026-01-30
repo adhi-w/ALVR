@@ -57,7 +57,7 @@ fn project_gaze_to_uv(eyes_combined: Quat, fov: alvr_common::Fov) -> Option<Vec2
     // u: right, v: down (texture UV convention)
     let u = ((x_proj - tanl) / width).clamp(0.0, 1.0);
     let v_up = ((y_proj - tand) / height).clamp(0.0, 1.0);
-    let v = 1.0 - v_up;
+    let v = /* 1.0 - */ v_up;
 
     Some(Vec2::new(u, v))
 }
