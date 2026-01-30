@@ -3,7 +3,8 @@ cbuffer FoveationVars {
 	uint2 optimizedResolution;
 	float2 eyeSizeRatio;
 	float2 centerSize;
-	float2 centerShift;
+	float2 centerShift_Left;
+	float2 centerShift_Right;
 	float2 edgeRatio;
 };
 
