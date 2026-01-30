@@ -542,10 +542,6 @@ void SetFoveationCenterShift(
     Settings::Instance().m_foveationCenterShiftYLeft = centerShiftYLeft;
     Settings::Instance().m_foveationCenterShiftXRight = centerShiftXRight;
     Settings::Instance().m_foveationCenterShiftYRight = centerShiftYRight;
-
-    // Keep the generic fields as a reasonable fallback/average.
-    Settings::Instance().m_foveationCenterShiftX = (centerShiftXLeft + centerShiftXRight) * 0.5f;
-    Settings::Instance().m_foveationCenterShiftY = (centerShiftYLeft + centerShiftYRight) * 0.5f;
 }
 
 void CaptureFrame() {
