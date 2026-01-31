@@ -685,6 +685,7 @@ pub extern "C" fn alvr_start_stream_opengl(config: AlvrStreamConfig) {
         convert_swapchain_array(config.swapchain_textures, config.swapchain_length);
     let foveated_encoding = config.enable_foveation.then_some(FoveatedEncodingConfig {
         method: FoveationMethod::DAADT2,
+        frw_magnitude: 4.66,
         force_enable: true,
         center_size_x: config.foveation_center_size_x,
         center_size_y: config.foveation_center_size_y,

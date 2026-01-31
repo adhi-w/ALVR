@@ -476,6 +476,15 @@ pub struct FoveatedEncodingConfig {
     #[schema(flag = "steamvr-restart")]
     pub method: FoveationMethod,
 
+    // Used only for D-FRW.
+    #[schema(strings(
+        display_name = "FRW magnitude",
+        help = "Controls the strength of the D-FRW tangent warp. Higher values increase peripheral compression."
+    ))]
+    #[schema(gui(slider(min = 0.1, max = 10.0, step = 0.01)))]
+    #[schema(flag = "steamvr-restart")]
+    pub frw_magnitude: f32,
+
     #[schema(strings(help = "Force enable on smartphone clients"))]
     pub force_enable: bool,
 
@@ -1862,6 +1871,7 @@ pub fn session_settings_default() -> SettingsDefault {
                     method: FoveationMethodDefault {
                         variant: FoveationMethodDefaultVariant::DAADT2,
                     },
+                    frw_magnitude: 4.66,
                     force_enable: false,
                     center_size_x: 0.3,
                     center_size_y: 0.3,

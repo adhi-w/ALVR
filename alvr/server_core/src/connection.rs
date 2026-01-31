@@ -125,9 +125,11 @@ pub fn contruct_openvr_config(session: &SessionConfig) -> OpenvrConfig {
     let mut foveation_edge_ratio_x = 0.0;
     let mut foveation_edge_ratio_y = 0.0;
     let mut foveation_method = 1u8; // D-AADT2
+    let mut foveation_frw_magnitude = 4.66;
     let enable_foveated_encoding = if let Switch::Enabled(config) = settings.video.foveated_encoding
     {
         foveation_method = config.method as u8;
+        foveation_frw_magnitude = config.frw_magnitude;
         foveation_center_size_x = config.center_size_x;
         foveation_center_size_y = config.center_size_y;
         foveation_center_shift_x = config.center_shift_x;
@@ -198,6 +200,7 @@ pub fn contruct_openvr_config(session: &SessionConfig) -> OpenvrConfig {
         foveation_center_shift_y,
         foveation_edge_ratio_x,
         foveation_edge_ratio_y,
+        foveation_frw_magnitude,
         enable_color_correction,
         brightness,
         contrast,

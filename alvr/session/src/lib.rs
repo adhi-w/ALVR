@@ -71,6 +71,7 @@ pub struct OpenvrConfig {
     pub foveation_center_shift_y: f32,
     pub foveation_edge_ratio_x: f32,
     pub foveation_edge_ratio_y: f32,
+    pub foveation_frw_magnitude: f32,
     pub enable_color_correction: bool,
     pub brightness: f32,
     pub contrast: f32,

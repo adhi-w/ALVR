@@ -38,6 +38,8 @@ public:
     float m_foveationCenterShiftYRight;
     float m_foveationEdgeRatioX;
     float m_foveationEdgeRatioY;
+    // Used only for method 3 (D-FRW)
+    float m_foveationFrwMagnitude;
 
     bool m_enableColorCorrection;
     float m_brightness;

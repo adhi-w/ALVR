@@ -60,6 +60,12 @@ void Settings::Load() {
         m_foveationCenterShiftYRight = m_foveationCenterShiftY;
         m_foveationEdgeRatioX = (float)config.get("foveation_edge_ratio_x").get<double>();
         m_foveationEdgeRatioY = (float)config.get("foveation_edge_ratio_y").get<double>();
+        auto frwMagnitudeJson = config.get("foveation_frw_magnitude");
+        if (frwMagnitudeJson.is<double>()) {
+            m_foveationFrwMagnitude = (float)frwMagnitudeJson.get<double>();
+        } else {
+            m_foveationFrwMagnitude = 4.66f;
+        }
 
         m_enableColorCorrection = config.get("enable_color_correction").get<bool>();
         m_brightness = (float)config.get("brightness").get<double>();

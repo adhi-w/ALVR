@@ -538,6 +538,13 @@ pub fn foveated_encoding_shader_constants(
     let c_right = (c2 * edge_ratio - c2) * (c1 - hi_bound_c + c2 * hi_bound_c)
         / (edge_ratio * (1. - hi_bound_c) * (1. - hi_bound_c));
 
+    let (center_size_x_const, center_size_y_const) = if config.method == alvr_session::FoveationMethod::DFRW {
+        let magnitude = config.frw_magnitude.max(0.01);
+        (magnitude, magnitude)
+    } else {
+        (center_size_aligned.x, center_size_aligned.y)
+    };
+
     let constants = [
         ("ENABLE_FFE", 1.),
         ("FOVEATION_METHOD", config.method as u8 as f32),
@@ -563,8 +570,8 @@ pub fn foveated_encoding_shader_constants(
         ("B_RIGHT_Y", b_right.y),
         ("C_RIGHT_X", c_right.x),
         ("C_RIGHT_Y", c_right.y),
-        ("CENTER_SIZE_X", center_size_aligned.x),
-        ("CENTER_SIZE_Y", center_size_aligned.y),
+        ("CENTER_SIZE_X", center_size_x_const),
+        ("CENTER_SIZE_Y", center_size_y_const),
     ]
     .iter()
     .map(|(k, v)| (*k, *v as f64))
