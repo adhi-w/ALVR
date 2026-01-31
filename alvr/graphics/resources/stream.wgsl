@@ -29,6 +29,8 @@ override UPSCALE_EDGE_THRESHOLD: f32 = 4.0/255.0;
 override UPSCALE_EDGE_SHARPNESS: f32 = 2.0;
 
 override ENABLE_FFE: bool = false;
+// 0: Vanilla (compressAxisAlignedPipeline), 1: D-AADT2 (AADT2Pipeline)
+override FOVEATION_METHOD: u32 = 1u;
 
 override VIEW_WIDTH_RATIO: f32 = 0.0;
 override VIEW_HEIGHT_RATIO: f32 = 0.0;
@@ -102,7 +104,7 @@ fn vertex_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 }
 
 //============================================================================================================
-// ------------------ AADT2 helper functions -------------------------------------------------
+// ------------------ D-AADT2 helper functions -------------------------------------------------
 fn MapUV_inverse_AADT2(coord: f32, center_start: f32, center_end: f32, first_peripheral_size: f32, next_peripheral_size: f32, cSize: f32, pSize: f32) -> f32 {
     let rate_peripheral: f32 = ((1.0 - cSize) / 2.0) / pSize;
     let rate_center: f32 = cSize / (center_end - center_start);
@@ -116,7 +118,60 @@ fn MapUV_inverse_AADT2(coord: f32, center_start: f32, center_end: f32, first_per
     }
     return out;
 }
+// ------------------ D-AADT3 helper functions -------------------------------------------------
+fn MapUV_inverse_AADT3(coord: f32, first_peripheral_start: f32, center_start: f32, center_end: f32, very_first_peripheral_size: f32, very_peripheral_size: f32, very_next_peripheral_size: f32, cSize: f32, pSize: f32) -> f32 {
+    let rate_peripheral: f32 = ((1.0 - (cSize)) / 4.0) / ((2.0 / 3.0) * pSize);
+    let rate_very_peripheral: f32 = ((1.0 - (cSize)) / 4.0) / ((1.0 / 3.0) * pSize);
+    let rate_center: f32 = cSize / (center_end - center_start);
+    var out: f32 = coord;
+    if (coord < very_first_peripheral_size) {
+        out = coord * (1.0 / rate_very_peripheral); // Maps to leftmost 1/8 of the texture
+    } else if (coord < (very_first_peripheral_size + very_peripheral_size)) {
+        out = first_peripheral_start + ((coord - very_first_peripheral_size) * (1.0 / rate_peripheral)); // Maps to left 1/8 of the texture
+    } else if (coord < (very_first_peripheral_size + very_peripheral_size + cSize)) {
+        out = center_start + (coord - very_first_peripheral_size - very_peripheral_size) * (1.0 / rate_center); // Maps to the center 1/2 of the texture
+    } else if (coord < (very_first_peripheral_size + very_peripheral_size + cSize + very_next_peripheral_size)) {
+        out = center_end + (coord - very_first_peripheral_size - very_peripheral_size - cSize) * (1.0 / rate_peripheral);
+    } else {
+       out = center_end + (((1.0 - center_end) / 3.0) * 2.0) + (coord - very_first_peripheral_size - very_peripheral_size - cSize - very_next_peripheral_size) * (1.0 / rate_very_peripheral); // Maps to the rightmost 1/4 of the texture
+    }
+    return out;
+}
+// ------------------ D-FRW helper functions -------------------------------------------------
+fn ReScale(value: f32, oldMin: f32, oldMax: f32, newMin: f32, newMax: f32) -> f32 {
+    return ((value - oldMin) / (oldMax - oldMin)) * (newMax - newMin) + newMin;
+}
 
+fn MapUV_inverse_FRW(coord_in: f32, magnitude: f32, centerShift: f32, angleFactor: f32) -> f32 {
+    var coord: f32 = coord_in;
+
+    // Compute c and d in one go.
+    var c: f32 = 0.0;
+    var d: f32 = 1.0;
+    if (centerShift <= 0.5) {
+        c = 0.5 - centerShift;
+        d = 1.0;
+    } else {
+        c = 0.0;
+        d = 1.5 - centerShift;
+    }
+    
+    // Precompute the warped endpoints.
+    let mini_x_i = tan(angleFactor * (c - 0.5)) / magnitude + 0.5;
+    let maxi_x_i = tan(angleFactor * (d - 0.5)) / magnitude + 0.5;
+    
+    // First re-scale from [0,1] to [mini_x_i, maxi_x_i].
+    coord = ReScale(coord, 0.0, 1.0, mini_x_i, maxi_x_i);
+    
+    // Apply the inverse warp.
+    coord = atan(magnitude * (coord - 0.5)) / angleFactor + 0.5;
+    
+    // Re-scale back from [c, d] to [0,1].
+    coord = ReScale(coord, c, d, 0.0, 1.0);
+    
+    return coord;
+}
+//-----------------------------------------------------------------------------------------------
 /* fn TextureToEyeUV(textureUV: vec2f, isRightEye: f32) -> vec2f {
     return vec2f((textureUV.x + isRightEye * (1.0 - 2.0 * textureUV.x)) * 2.0, textureUV.y);
 }
@@ -132,7 +187,9 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
     var corrected_uv = uv;
     // tell upscaler to target a lower resolution for the edges
     var upscale_source_resolution = 1.0;
-/*     if ENABLE_FFE {
+
+    // -- Vanilla Shaders ---
+    if (ENABLE_FFE && FOVEATION_METHOD == 0u) {
         let view_size_ratio = vec2f(VIEW_WIDTH_RATIO, VIEW_HEIGHT_RATIO);
         let edge_ratio = vec2f(EDGE_X_RATIO, EDGE_Y_RATIO);
 
@@ -181,8 +238,9 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
         if pc.view_idx == 1 {
             corrected_uv.x = 1.0 - corrected_uv.x;
         }
-    } */
-
+    }
+    else if (ENABLE_FFE && FOVEATION_METHOD == 1u) {
+            // -- D-AADT2 Shaders ---
             // let EdgeRatio = vec2f(2.0, 2.0);
             // let CenterSize = vec2f(0.4, 0.4);   
             // let CenterShift = vec2f(0.6, 0.5);
@@ -237,8 +295,93 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
             uncompressedUV.y = MapUV_inverse_AADT2(alignedUV.y, center_start.y, center_end.y, bottom_peripheral_size, top_peripheral_size, CenterSizeOwn.y, PeripheralNewScreenSpace.y);
 
             // obtain final texture UV
-            corrected_uv = uncompressedUV;
+            corrected_uv = uncompressedUV;             
+    }
+    else if (ENABLE_FFE && FOVEATION_METHOD == 2u) {
+            // -- D-AADT3 Shaders ---
+            let EdgeRatio = vec2f(EDGE_X_RATIO, EDGE_Y_RATIO);
+            let CenterSize = vec2f(CENTER_SIZE_X, CENTER_SIZE_Y);
 
+            var CenterSizeOwn = CenterSize;
+            var PeripheralNewScreenSpace = (((1.0 - CenterSizeOwn) / (2.0 * EdgeRatio)) + ((1.0 - CenterSizeOwn) / (2.0 * (EdgeRatio / 2.0)))) / 2.0;
+            var CenterSizeNewScreenSpace = 1.0 - (PeripheralNewScreenSpace * 2.0);
+            var CenterShiftOwn = dbg.center_shift_pos.left;
+
+            var isRightEye: f32 = f32(pc.view_idx);
+            // Re-scale to -1..1
+            if (isRightEye == 1.0) {
+                CenterShiftOwn = dbg.center_shift_pos.right;
+                // CenterShiftOwn.x = 1.0 - CenterShiftOwn.x; // this is unnecessary because right eye can use its independent center shift in multiview frames.
+            }
+            CenterShiftOwn.y = 1.0 - CenterShiftOwn.y;
+            CenterShiftOwn.x = 2.0 * CenterShiftOwn.x - 1.0;
+            CenterShiftOwn.y = 2.0 * CenterShiftOwn.y - 1.0;
+
+            var alignedUV = corrected_uv;
+
+            // Peripheral size without center shift (texture-space)
+            var peripheral_size = (1.0 - CenterSizeOwn) / 4.0;
+            
+            // Center max shift (texture-space)
+            var center_max_shift_x = 2.0 * vec2(0.5 - (peripheral_size.x * 2.0), 0.5 + (peripheral_size.x  * 2.0)) - 1.0;
+            var center_max_shift_y = 2.0 * vec2(0.5 - (peripheral_size.y * 2.0), 0.5 + (peripheral_size.y  * 2.0)) - 1.0;
+            var centerShift_clamp: vec2f;
+            centerShift_clamp.x = clamp(CenterShiftOwn.x, center_max_shift_x.x, center_max_shift_x.y);
+            centerShift_clamp.y = clamp(CenterShiftOwn.y, center_max_shift_y.x, center_max_shift_y.y);
+            
+            // Foveation parameters (screen-space)
+            var center_start: vec2f;
+            center_start.x = (PeripheralNewScreenSpace.x + ((centerShift_clamp.x / center_max_shift_x.y) * PeripheralNewScreenSpace.x));
+            center_start.y = (PeripheralNewScreenSpace.y + ((centerShift_clamp.y / center_max_shift_y.y) * PeripheralNewScreenSpace.y));
+            var center_end = center_start + CenterSizeNewScreenSpace;
+            var first_peripheral_start = center_start / 3.0;
+            
+            // Fixed peripheral size (texture-space)
+            var left_peripheral_size = (center_start.x / PeripheralNewScreenSpace.x) * peripheral_size.x;
+            var very_left_peripheral_size = (center_start.x / PeripheralNewScreenSpace.x) * peripheral_size.x; 
+            var right_peripheral_size = ((1.0 - CenterSizeOwn.x) - left_peripheral_size - very_left_peripheral_size) / 2.0;
+            
+            var bottom_peripheral_size = (center_start.y / PeripheralNewScreenSpace.y) * peripheral_size.y;
+            var very_bottom_peripheral_size = (center_start.y / PeripheralNewScreenSpace.y) * peripheral_size.y;
+            var top_peripheral_size = ((1.0 - CenterSizeOwn.y) - bottom_peripheral_size - very_bottom_peripheral_size) / 2.0;
+            
+            // Screen space uv
+            var uncompressedUV: vec2f;
+            uncompressedUV.x = MapUV_inverse_AADT3(alignedUV.x, first_peripheral_start.x, center_start.x, center_end.x, very_left_peripheral_size, left_peripheral_size, right_peripheral_size, CenterSizeOwn.x, PeripheralNewScreenSpace.x);
+            uncompressedUV.y = MapUV_inverse_AADT3(alignedUV.y, first_peripheral_start.y, center_start.y, center_end.y, very_bottom_peripheral_size, bottom_peripheral_size, top_peripheral_size, CenterSizeOwn.y, PeripheralNewScreenSpace.y);
+
+            // obtain final texture UV
+            corrected_uv = uncompressedUV;  
+    }
+    else if (ENABLE_FFE && FOVEATION_METHOD == 3u) {
+            // -- D-FRW Shaders ---
+            let magnitude: f32 = max(CENTER_SIZE_X, 0.01);
+            var CenterShiftOwn = dbg.center_shift_pos.left;
+            
+            var isRightEye: f32 = f32(pc.view_idx);
+            // If this is the right eye, adjust the center shift.
+            if (isRightEye == 1.0) {
+                CenterShiftOwn = dbg.center_shift_pos.right;
+                // CenterShiftOwn.x = 1.0 - CenterShiftOwn.x; // this is unnecessary because right eye can use its independent center shift in multiview frames.
+            }
+            CenterShiftOwn.y = 1.0 - CenterShiftOwn.y;
+            
+            // Transform screen UV to aligned eye UV.
+            var alignedUV = corrected_uv;
+            
+            // Precompute the common angle factor to avoid repeated calculations.
+            var angleFactor = 2.0 * atan(magnitude / 2.0);
+            
+            // Decode each coordinate using the optimized inverse warp function.
+            var uncompressedUV: vec2f;
+            uncompressedUV.x = MapUV_inverse_FRW(alignedUV.x, magnitude, CenterShiftOwn.x, angleFactor);
+            uncompressedUV.y = MapUV_inverse_FRW(alignedUV.y, magnitude, CenterShiftOwn.y, angleFactor);
+            
+            // obtain final texture UV
+            corrected_uv = uncompressedUV;  
+
+            // return vec4f(0.0, 0.0, 1.0, 1.0); // D-FRW not implemented yet
+    }
 
     var color: vec3f;
     if ENABLE_UPSCALING {
@@ -299,7 +442,7 @@ fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
             cs_uv = dbg.center_shift_pos.right;
         }
         cs_uv.y = 1.0 - cs_uv.y; // Flip Y for texture UV space
-        
+
         let dist = distance(uv, cs_uv);
         let radius = CENTER_SHIFT_MARKER_RADIUS;
         let feather = max(CENTER_SHIFT_MARKER_FEATHER, 0.0001);

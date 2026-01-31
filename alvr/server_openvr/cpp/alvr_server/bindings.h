@@ -90,6 +90,10 @@ struct FfiDynamicEncoderParams {
 
 extern "C" const unsigned char* AADT2_CSO_PTR;
 extern "C" unsigned int AADT2_CSO_LEN;
+extern "C" const unsigned char* AADT3_CSO_PTR;
+extern "C" unsigned int AADT3_CSO_LEN;
+extern "C" const unsigned char* FRW_CSO_PTR;
+extern "C" unsigned int FRW_CSO_LEN;
 
 extern "C" const unsigned char* FRAME_RENDER_VS_CSO_PTR;
 extern "C" unsigned int FRAME_RENDER_VS_CSO_LEN;

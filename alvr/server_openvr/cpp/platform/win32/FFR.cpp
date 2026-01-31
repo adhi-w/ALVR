@@ -89,6 +89,15 @@ FoveationVars CalculateFoveationVars() {
     float optimizedEyeWidth = foveationScaleX * targetEyeWidth;
     float optimizedEyeHeight = foveationScaleY * targetEyeHeight;
 
+    if (Settings::Instance().m_foveationMethod == 3) {
+        float magnitude = (float)Settings::Instance().m_foveationFrwMagnitude;
+        if (magnitude <= 0.0f) {
+            magnitude = 4.66f;
+        }
+        centerSizeXAligned = magnitude;
+        centerSizeYAligned = magnitude;
+    }
+
     // round the frame dimensions to a number of pixel multiple of 32 for the encoder
     auto optimizedEyeWidthAligned = (uint32_t)ceil(optimizedEyeWidth / 32.f) * 32;
     auto optimizedEyeHeightAligned = (uint32_t)ceil(optimizedEyeHeight / 32.f) * 32;
@@ -143,7 +152,15 @@ void FFR::Initialize(ID3D11Texture2D* compositionTexture) {
                                          : DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
     );
 
-     if (Settings::Instance().m_enableFoveatedEncoding) {
+   if (Settings::Instance().m_enableFoveatedEncoding) {
+    // 0: Vanilla (compressAxisAlignedPipeline)
+    // 1: D-AADT2 
+    // 2: D-AADT3 
+    // 3: D-FRW  
+    const uint32_t method = Settings::Instance().m_foveationMethod;
+
+    if (method == 0) {
+        // --- Vanilla Shaders ---
         std::vector<uint8_t> compressAxisAlignedShaderCSO(
             COMPRESS_AXIS_ALIGNED_CSO_PTR,
             COMPRESS_AXIS_ALIGNED_CSO_PTR + COMPRESS_AXIS_ALIGNED_CSO_LEN
@@ -156,24 +173,46 @@ void FFR::Initialize(ID3D11Texture2D* compositionTexture) {
             mOptimizedTexture.Get(),
             mFoveatedRenderingBuffer.Get()
         );
-
-        mPipelines.push_back(compressAxisAlignedPipeline); 
-
-        /* std::vector<uint8_t> AADTCSO(
-            AADT2_CSO_PTR,
-            AADT2_CSO_PTR + AADT2_CSO_LEN
-        );
-        auto AADT2Pipeline = RenderPipeline(mDevice.Get());
-        AADT2Pipeline.Initialize(
+        mPipelines.push_back(compressAxisAlignedPipeline);
+    } else if (method == 1) {
+        // --- D-AADT2 Shaders ---
+        std::vector<uint8_t> aadt2CSO(AADT2_CSO_PTR, AADT2_CSO_PTR + AADT2_CSO_LEN);
+        auto aadt2Pipeline = RenderPipeline(mDevice.Get());
+        aadt2Pipeline.Initialize(
             { compositionTexture },
             mQuadVertexShader.Get(),
-            AADTCSO,
+            aadt2CSO,
             mOptimizedTexture.Get(),
             mFoveatedRenderingBuffer.Get()
         );
+        mPipelines.push_back(aadt2Pipeline);
+    } else if (method == 2) {
+        // --- D-AADT3 Shaders ---
+        std::vector<uint8_t> aadt3CSO(AADT3_CSO_PTR, AADT3_CSO_PTR + AADT3_CSO_LEN);
+        auto aadt3Pipeline = RenderPipeline(mDevice.Get());
+        aadt3Pipeline.Initialize(
+            { compositionTexture },
+            mQuadVertexShader.Get(),
+            aadt3CSO,
+            mOptimizedTexture.Get(),
+            mFoveatedRenderingBuffer.Get()
+        );
+        mPipelines.push_back(aadt3Pipeline);
+    } else if (method == 3) {
+        // --- D-FRW Shaders ---
+        std::vector<uint8_t> frwCSO(FRW_CSO_PTR, FRW_CSO_PTR + FRW_CSO_LEN);
+        auto frwPipeline = RenderPipeline(mDevice.Get());
+        frwPipeline.Initialize(
+            { compositionTexture },
+            mQuadVertexShader.Get(),
+            frwCSO,
+            mOptimizedTexture.Get(),
+            mFoveatedRenderingBuffer.Get()
+        );
+        mPipelines.push_back(frwPipeline);
 
-        mPipelines.push_back(AADT2Pipeline); */
-    } else {
+    }
+ } else {
         mOptimizedTexture = compositionTexture;
     }
 }

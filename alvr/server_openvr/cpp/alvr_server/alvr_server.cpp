@@ -177,6 +177,10 @@ public:
 // bindigs for Rust
 const unsigned char* AADT2_CSO_PTR;
 unsigned int AADT2_CSO_LEN;
+const unsigned char* AADT3_CSO_PTR;
+unsigned int AADT3_CSO_LEN;
+const unsigned char* FRW_CSO_PTR;
+unsigned int FRW_CSO_LEN;
 
 const unsigned char* FRAME_RENDER_VS_CSO_PTR;
 unsigned int FRAME_RENDER_VS_CSO_LEN;
