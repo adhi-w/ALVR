@@ -25,6 +25,8 @@ public:
     std::string m_captureFrameDir;
 
     bool m_enableFoveatedEncoding;
+    // 0: Vanilla, 1: D-AADT2, 2: D-AADT3, 3: D-FRW
+    uint32_t m_foveationMethod;
     float m_foveationCenterSizeX;
     float m_foveationCenterSizeY;
     float m_foveationCenterShiftX;

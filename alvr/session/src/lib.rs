@@ -64,6 +64,7 @@ pub struct OpenvrConfig {
     pub body_tracking_vive_enabled: bool,
     pub body_tracking_has_legs: bool,
     pub enable_foveated_encoding: bool,
+    pub foveation_method: u8,
     pub foveation_center_size_x: f32,
     pub foveation_center_size_y: f32,
     pub foveation_center_shift_x: f32,

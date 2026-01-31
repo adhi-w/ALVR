@@ -47,6 +47,8 @@ void Settings::Load() {
         m_captureFrameDir = config.get("capture_frame_dir").get<std::string>();
 
         m_enableFoveatedEncoding = config.get("enable_foveated_encoding").get<bool>();
+        m_foveationMethod = (uint32_t)config.get("foveation_method").get<int64_t>();
+
         m_foveationCenterSizeX = (float)config.get("foveation_center_size_x").get<double>();
         m_foveationCenterSizeY = (float)config.get("foveation_center_size_y").get<double>();
         m_foveationCenterShiftX = (float)config.get("foveation_center_shift_x").get<double>();

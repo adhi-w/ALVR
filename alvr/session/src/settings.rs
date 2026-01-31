@@ -454,9 +454,28 @@ pub struct ClientsideFoveationConfig {
     pub vertical_offset_deg: f32,
 }
 
+#[repr(u8)]
+#[derive(SettingsSchema, Serialize, Deserialize, Debug, Copy, Clone, PartialEq, Eq, Default)]
+#[schema(gui = "button_group")]
+pub enum FoveationMethod {
+    Vanilla = 0,
+    #[default]
+    #[schema(strings(display_name = "D-AADT2"))]
+    DAADT2 = 1,
+    #[schema(strings(display_name = "D-AADT3"))]
+    DAADT3 = 2,
+    #[schema(strings(display_name = "D-FRW"))]
+    DFRW = 3,
+}
+
 #[derive(SettingsSchema, Serialize, Deserialize, Clone, PartialEq)]
 #[schema(collapsible)]
 pub struct FoveatedEncodingConfig {
+    #[serde(default)]
+    #[schema(strings(display_name = "Method"))]
+    #[schema(flag = "steamvr-restart")]
+    pub method: FoveationMethod,
+
     #[schema(strings(help = "Force enable on smartphone clients"))]
     pub force_enable: bool,
 
@@ -471,12 +490,12 @@ pub struct FoveatedEncodingConfig {
     pub center_size_y: f32,
 
     #[schema(strings(display_name = "Center shift X"))]
-    #[schema(gui(slider(min = -1.0, max = 1.0, step = 0.01)))]
+    #[schema(gui(slider(min = 0.0, max = 1.0, step = 0.01)))]
     #[schema(flag = "steamvr-restart")]
     pub center_shift_x: f32,
 
     #[schema(strings(display_name = "Center shift Y"))]
-    #[schema(gui(slider(min = -1.0, max = 1.0, step = 0.01)))]
+    #[schema(gui(slider(min = 0.0, max = 1.0, step = 0.01)))]
     #[schema(flag = "steamvr-restart")]
     pub center_shift_y: f32,
 
@@ -1840,6 +1859,9 @@ pub fn session_settings_default() -> SettingsDefault {
                 enabled: true,
                 content: FoveatedEncodingConfigDefault {
                     gui_collapsed: true,
+                    method: FoveationMethodDefault {
+                        variant: FoveationMethodDefaultVariant::DAADT2,
+                    },
                     force_enable: false,
                     center_size_x: 0.3,
                     center_size_y: 0.3,

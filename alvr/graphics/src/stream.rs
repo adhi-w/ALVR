@@ -540,6 +540,7 @@ pub fn foveated_encoding_shader_constants(
 
     let constants = [
         ("ENABLE_FFE", 1.),
+        ("FOVEATION_METHOD", config.method as u8 as f32),
         ("VIEW_WIDTH_RATIO", view_ratio_aligned.x),
         ("VIEW_HEIGHT_RATIO", view_ratio_aligned.y),
         ("EDGE_X_RATIO", edge_ratio.x),

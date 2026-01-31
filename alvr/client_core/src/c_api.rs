@@ -19,7 +19,8 @@ use alvr_graphics::{
 };
 use alvr_packets::{ButtonEntry, ButtonValue, FaceData, TrackingData};
 use alvr_session::{
-    CodecType, FoveatedEncodingConfig, MediacodecPropType, MediacodecProperty, UpscalingConfig,
+    CodecType, FoveatedEncodingConfig, FoveationMethod, MediacodecPropType, MediacodecProperty,
+    UpscalingConfig,
 };
 use std::{
     cell::RefCell,
@@ -683,6 +684,7 @@ pub extern "C" fn alvr_start_stream_opengl(config: AlvrStreamConfig) {
     let swapchain_textures =
         convert_swapchain_array(config.swapchain_textures, config.swapchain_length);
     let foveated_encoding = config.enable_foveation.then_some(FoveatedEncodingConfig {
+        method: FoveationMethod::DAADT2,
         force_enable: true,
         center_size_x: config.foveation_center_size_x,
         center_size_y: config.foveation_center_size_y,
