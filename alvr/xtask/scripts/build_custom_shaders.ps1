@@ -35,7 +35,7 @@ $fxc = Find-Fxc
 Write-Host "Using fxc: $fxc"
 
 $items = @(
-    # @{ in = 'CompressAxisAlignedPixelShader.hlsl'; out = 'CompressAxisAlignedPixelShader.cso'   ; entry = 'main'; profile = 'ps_5_0' }
+    @{ in = 'CompressAxisAlignedPixelShader.hlsl'; out = 'CompressAxisAlignedPixelShader.cso'   ; entry = 'main'; profile = 'ps_5_0' }
     @{ in = 'AADT2PixelShader.hlsl'; out = 'AADT2PixelShader.cso'; entry = 'main'; profile = 'ps_5_0' },
     @{ in = 'AADT3PixelShader.hlsl'; out = 'AADT3PixelShader.cso'; entry = 'main'; profile = 'ps_5_0' },
     @{ in = 'FRWPixelShader.hlsl'  ; out = 'FRWPixelShader.cso'  ; entry = 'main'; profile = 'ps_5_0' }
